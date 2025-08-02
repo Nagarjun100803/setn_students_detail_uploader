@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SETN</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+
+  <div class="w-full max-w-sm bg-white rounded-2xl shadow-lg p-6">
+    <h1 class="text-3xl font-extrabold text-center text-blue-700 mb-6">SETN</h1>
+
+    <!-- Email Verification -->
+    <div id="verify-section" class="space-y-3">
+      <label for="email_id" class="block text-sm font-semibold text-gray-700">Enter your Email</label>
+      <input type="email" id="email_id" name="email_id"
+             placeholder="you@example.com"
+             class="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+      <button onclick="verifyEmail()"
+              class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-semibold transition">
+        Verify Email
+      </button>
+      <p id="verify-message" class="text-center text-sm font-medium text-red-600 hidden"></p>
+    </div>
+
+    <!-- Bank Details Form -->
+    <form id="bank-form" onsubmit="submitBankDetails(event)" class="space-y-4 mt-6 hidden">
+      <input type="hidden" id="verified_email_id" name="email_id">
+
+      <div>
+        <label for="account_holder_name" class="block text-sm font-semibold text-gray-700">Account Holder Name</label>
+        <input type="text" id="account_holder_name" name="account_holder_name"
+               class="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+      </div>
+
+      <div>
+        <label for="bank_name" class="block text-sm font-semibold text-gray-700">Bank Name</label>
+        <input type="text" id="bank_name" name="bank_name"
+               class="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+      </div>
+
+      <div>
+        <label for="account_num" class="block text-sm font-semibold text-gray-700">Account Number</label>
+        <input type="text" id="account_num" name="account_num"
+               class="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+      </div>
+
+      <div>
+        <label for="ifsc_code" class="block text-sm font-semibold text-gray-700">IFSC Code</label>
+        <input type="text" id="ifsc_code" name="ifsc_code"
+               class="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+      </div>
+
+      <button type="submit"
+              class="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg font-semibold transition">
+        Submit Details
+      </button>
+    </form>
+  </div>
+
+  <!-- ✅ Modal Popup for POST only -->
+  <div id="modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-xl shadow-lg p-6 max-w-sm w-full text-center">
+      <h2 id="modal-title" class="text-xl font-bold mb-2"></h2>
+      <p id="modal-message" class="text-gray-700 mb-6"></p>
+      <button onclick="closeModal()"
+              class="px-6 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition">
+        Close
+      </button>
+    </div>
+  </div>
+
+  <script>
+    function showModal(title, message, isSuccess = false) {
+      const modal = document.getElementById("modal");
+      const titleEl = document.getElementById("modal-title");
+      const messageEl = document.getElementById("modal-message");
+
+      titleEl.textContent = title;
+      messageEl.textContent = message;
+      titleEl.className = "text-xl font-bold mb-2 " + (isSuccess ? "text-green-600" : "text-red-600");
+
+      modal.classList.remove("hidden");
+    }
+
+    function closeModal() {
+      document.getElementById("modal").classList.add("hidden");
+
+      // Reset only on success
+      if (document.getElementById("modal-title").classList.contains("text-green-600")) {
+        document.getElementById("email_id").value = "";
+        document.getElementById("verified_email_id").value = "";
+        document.getElementById("bank-form").reset();
+        document.getElementById("bank-form").classList.add("hidden");
+        document.getElementById("verify-message").classList.add("hidden");
+      }
+    }
+
+    async function verifyEmail() {
+      const email = document.getElementById("email_id").value.trim().toLowerCase();
+      const messageEl = document.getElementById("verify-message");
+
+      if (!email) {
+        messageEl.textContent = "Please enter a valid email address.";
+        messageEl.classList.remove("hidden");
+        return;
+      }
+
+      try {
+        const response = await fetch(`/beneficiary/${email}`);
+        const isValid = await response.json();
+
+        if (isValid) {
+          document.getElementById("verified_email_id").value = email;
+          document.getElementById("bank-form").classList.remove("hidden");
+          messageEl.classList.add("hidden");
+        } else {
+          messageEl.textContent = "Email does not exist in our records.";
+          messageEl.classList.remove("hidden");
+          document.getElementById("bank-form").classList.add("hidden");
+        }
+      } catch (error) {
+        console.error(error);
+        messageEl.textContent = "Error verifying email.";
+        messageEl.classList.remove("hidden");
+      }
+    }
+
+    async function submitBankDetails(event) {
+      event.preventDefault();
+
+      const payload = {
+        email_id: document.getElementById("verified_email_id").value,
+        account_holder_name: document.getElementById("account_holder_name").value,
+        bank_name: document.getElementById("bank_name").value,
+        account_num: document.getElementById("account_num").value,
+        ifsc_code: document.getElementById("ifsc_code").value
+      };
+
+      try {
+        const response = await fetch("/bank_details/create", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+
+        const result = await response.json();
+
+        if (result.status === "success") {
+          showModal("Success", result.message, true);
+        } else {
+          showModal("Error", result.message);
+        }
+      } catch (error) {
+        console.error(error);
+        showModal("Error", "Submission failed. Please try again.");
+      }
+    }
+  </script>
+</body>
+</html>

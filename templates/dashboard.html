@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SETN Admin Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 min-h-screen p-4 flex items-center justify-center">
+  <div class="w-full max-w-6xl bg-white shadow-lg rounded-xl p-6">
+    <h1 class="text-3xl font-bold text-center text-blue-700 mb-6">SETN - Admin Dashboard</h1>
+
+    <!-- Admin Login Form -->
+    <form id="login-form" class="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-lg mx-auto mb-8" onsubmit="verifyAdmin(event)">
+      <input type="text" id="admin_username" placeholder="Admin Username" required
+             class="p-3 border rounded-md focus:ring-2 focus:ring-blue-500" />
+      <input type="password" id="admin_password" placeholder="Password" required
+             class="p-3 border rounded-md focus:ring-2 focus:ring-blue-500" />
+      <button type="submit"
+              class="col-span-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-md font-semibold">
+        Login
+      </button>
+      <p id="login-error" class="col-span-full text-center text-red-600 text-sm hidden">Invalid credentials</p>
+    </form>
+
+    <!-- Bank Details Dashboard -->
+    <div id="dashboard" class="hidden">
+      <div class="overflow-x-auto max-h-[500px] overflow-y-scroll border rounded-md">
+        <table class="w-full min-w-[900px] text-sm text-left border-collapse">
+          <thead class="bg-blue-600 text-white text-xs uppercase sticky top-0 z-10">
+            <tr>
+              <th class="p-3">App No</th>
+              <th class="p-3">Name</th>
+              <th class="p-3">Email</th>
+              <th class="p-3">Bank</th>
+              <th class="p-3">Phone</th>
+              <th class="p-3">Acc Holder</th>
+              <th class="p-3">Acc No</th>
+              <th class="p-3">IFSC</th>
+              <th class="p-3">Created</th>
+            </tr>
+          </thead>
+          <tbody id="table-body" class="bg-white divide-y divide-gray-200"></tbody>
+        </table>
+      </div>
+
+      <!-- Pagination -->
+      <div class="flex justify-center gap-4 mt-4 text-sm">
+        <button onclick="changePage(-1)" id="prev-btn" class="px-4 py-1 bg-gray-200 rounded disabled:opacity-50">Prev</button>
+        <span id="page-info" class="self-center font-medium"></span>
+        <button onclick="changePage(1)" id="next-btn" class="px-4 py-1 bg-gray-200 rounded disabled:opacity-50">Next</button>
+      </div>
+
+      <!-- Download Button -->
+      <div class="text-center mt-6">
+        <a href="/admin/download_bank_details"
+           class="inline-block bg-green-600 hover:bg-green-700 text-white py-2 px-6 rounded-md font-semibold">
+          Download Excel
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let allData = [];
+    let currentPage = 1;
+    const rowsPerPage = 50;
+
+    async function verifyAdmin(event) {
+      event.preventDefault();
+      const username = document.getElementById("admin_username").value.trim();
+      const password = document.getElementById("admin_password").value.trim();
+
+      const url = `/verify_admin?admin_username=${encodeURIComponent(username)}&admin_password=${encodeURIComponent(password)}`;
+      const res = await fetch(url);
+      const data = await res.json();
+
+      if (data.status === "success") {
+        document.getElementById("login-form").classList.add("hidden");
+        document.getElementById("dashboard").classList.remove("hidden");
+        loadBankDetails();
+      } else {
+        document.getElementById("login-error").classList.remove("hidden");
+      }
+    }
+
+    async function loadBankDetails() {
+      const res = await fetch("/admin/bank_details");
+      allData = await res.json();
+      currentPage = 1;
+      renderTable();
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById("table-body");
+      tbody.innerHTML = "";
+
+      const start = (currentPage - 1) * rowsPerPage;
+      const end = start + rowsPerPage;
+      const pageData = allData.slice(start, end);
+
+      pageData.forEach(row => {
+        const tr = document.createElement("tr");
+
+        tr.innerHTML = `
+          <td class="p-3">${row.application_num || ''}</td>
+          <td class="p-3">${row.full_name || ''}</td>
+          <td class="p-3">${row.email_id}</td>
+          <td class="p-3">${row.bank_name}</td>
+          <td class="p-3">${row.phone_num || ''}</td>
+          <td class="p-3">${row.account_holder_name}</td>
+          <td class="p-3">${row.account_num}</td>
+          <td class="p-3">${row.ifsc_code}</td>
+          <td class="p-3">${new Date(row.created_at).toLocaleString()}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      updatePaginationControls();
+    }
+
+    function updatePaginationControls() {
+      const totalPages = Math.ceil(allData.length / rowsPerPage);
+      document.getElementById("page-info").textContent = `Page ${currentPage} of ${totalPages}`;
+      document.getElementById("prev-btn").disabled = currentPage === 1;
+      document.getElementById("next-btn").disabled = currentPage === totalPages;
+    }
+
+    function changePage(delta) {
+      const totalPages = Math.ceil(allData.length / rowsPerPage);
+      currentPage = Math.max(1, Math.min(currentPage + delta, totalPages));
+      renderTable();
+    }
+  </script>
+</body>
+</html>

@@ -1,4 +1,4 @@
-fastapi
+fastapi[all]
 uvicorn[standard]
 pydantic-settings
 psycopg2-binary
@@ -6,3 +6,4 @@ pandas
 openpyxl
 jinja2
 python-multipart
+httpcore

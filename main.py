@@ -1,4 +1,5 @@
 import io
+from typing import Literal
 from fastapi import FastAPI, Query, Request, Form
 from fastapi.responses import StreamingResponse
 from fastapi.templating import Jinja2Templates
@@ -242,3 +243,85 @@ def get_dashboard(request: Request):
             "request": request
         }
     )
+
+@app.get("/download/not_completed")
+def get_not_completed_students_list(request: Request):
+    sql: str = """
+        select 
+            * 
+        from 
+            beneficiaries 
+        where 
+            not exists (
+                select 
+                    1 
+                from 
+                    bank_details 
+                where 
+                    bank_details.email_id = beneficiaries.email_id
+                )
+            and list = %(list)s 
+    """
+
+    list_1 = execute_sql_select_statement(sql, vars = {"list": 1})
+    list_2 = execute_sql_select_statement(sql, vars = {"list": 2})
+    
+    list_1_df = pd.DataFrame() if not list_1 else pd.DataFrame(list_1)
+    list_2_df = pd.DataFrame() if not list_2 else pd.DataFrame(list_2)
+
+    def clean_df(df: pd.DataFrame) -> pd.DataFrame:
+        """Clean the DataFrame by removing non-printable characters from string columns."""
+        for col in df.select_dtypes(include=['object']):
+            df[col] = df[col].astype(str).replace(
+                r'[\x00-\x08\x0B\x0C\x0E-\x1F]', '', regex=True
+            )
+        return df
+    
+    file = io.BytesIO()
+    with pd.ExcelWriter(file, engine = "openpyxl") as writer:
+         # Write each list to a separate sheet
+        cleaned_list_1_df = clean_df(list_1_df)
+        cleaned_list_2_df = clean_df(list_2_df)
+        
+        cleaned_list_1_df.to_excel(writer, index=False, sheet_name="list_1")
+        cleaned_list_2_df.to_excel(writer, index=False, sheet_name="list_2")
+    file.seek(0)
+
+    # filename should contains downloading date and time
+    from datetime import datetime
+    current_time = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+    filename = f"not_completed_students_{current_time}.xlsx"
+    return StreamingResponse(
+        file,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}.xlsx"}
+    )
+    
+
+
+@app.get("/not_completed_count")
+def get_not_completed_students_count(
+    request: Request
+):
+    sql: str = """
+        select
+            count(*), list
+        from 
+            beneficiaries
+        where
+            not exists(
+                select 
+                    1
+                from
+                    bank_details
+                where
+                    beneficiaries.email_id = bank_details.email_id
+            ) 
+        group by 
+            list
+        ;
+    """
+
+    records = execute_sql_select_statement(sql)
+
+    return records

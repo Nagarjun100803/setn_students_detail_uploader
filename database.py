@@ -87,7 +87,8 @@ table_schema: str = """
             aadhar_num varchar(12) not null,
             email_id varchar(100) not null unique,
             phone_num varchar,
-            application_num integer
+            application_num integer,
+            list int
         );
 
 
